@@ -1,0 +1,215 @@
+#!/usr/bin/perl
+# check_tor_bandwidth - Get performance data from your relay
+# Copyright (C) <year>  <name of author>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+use IO::Socket::UNIX qw( SOCK_STREAM );
+
+our $DEBUG = 0;
+
+main();
+
+sub main {
+    checkDebugSwitch();
+
+    my $socket = openSocket();
+    authenticate($socket);
+    my $config = fetchConfig($socket);
+    my $rejectCount = fetchExitPolicyRejectCount($config);
+    my $bandwidthRate = fetchRelayBandwidthRate($config);
+    my $bandwidthBurst = fetchRelayBandwidthBurst($config);
+    my @results = fetchBandwidth($socket);
+    quit($socket);
+
+    printf("OK - Read: %d Write: %d Reject-Count: %d|read=%d;0;0;%d;%d write=%d;0;0;%d;%d rejectCount=%d\n",
+        $results[0],
+        $results[1],
+        $rejectCount,
+        $results[0],
+        $bandwidthRate,
+        $bandwidthBurst,
+        $results[1],
+        $bandwidthRate,
+        $bandwidthBurst,
+        $rejectCount);
+
+    exit(0);
+}
+
+sub openSocket {
+    my $socket = IO::Socket::UNIX->new(
+       Type => SOCK_STREAM,
+       Peer => '/var/run/tor/control',
+    ) or exitCritical("Can't connect to server: $!");
+
+    writeLog('Opened socket');
+
+    return $socket;
+}
+
+sub authenticate {
+    my $socket = shift;
+
+    my $result = talkToSocketAndReceiveOutput(
+        $socket,
+        "AUTHENTICATE"
+    );
+
+    if ( $result !~ /250 OK/ ) {
+        exitCritical("Was not able to authenticate. Result: $result");
+    }
+
+    writeLog('Authenticated');
+}
+
+sub quit {
+    my $socket = shift;
+
+    talkToSocketAndReceiveOutput(
+        $socket,
+        "QUIT\n"
+    );
+}
+
+sub talkToSocketAndReceiveOutput {
+    my ($socket, $command) = @_;
+    my $line;
+
+    print $socket "$command\n";
+
+    writeLog('Sent command ' . $command);
+
+    $line = <$socket>;
+    chomp($line);
+
+    writeLog('Received line: '. $line);
+
+    return $line;
+}
+
+sub fetchBandwidth {
+    my $socket = shift;
+    my $line;
+    my $read = 0;
+    my $write = 0;
+
+    print $socket "SETEVENTS BW\n";
+    writeLog('Startet listening for BW events');
+    sleep(2);
+    print $socket "SETEVENTS\n";
+    writeLog('Stopped listening fro BW events');
+
+    while ( $line = <$socket> ) {
+        chomp($line);
+
+        if ( $line =~ m/650 BW (\d+) (\d+)/ ) {
+            $read = $1;
+            $write = $2;
+            last;
+        }
+    }
+
+    if ( $read == 0 || $write == 0 ) {
+        exitCritical("Didn't receive values. Read: $read Write: $write");
+    }
+
+    my @ret;
+    $ret[0] = $read;
+    $ret[1] = $write;
+
+    return @ret;
+}
+
+sub fetchExitPolicyRejectCount {
+    my $config = shift;
+    my $rejectCount = 0;
+
+    foreach my $line ( split("\n", $config) ) {
+        chomp($line);
+
+        if ( $line =~ /reject/ ) {
+            writeLog('Found reject line');
+            $rejectCount++;
+        }
+    }
+
+    return $rejectCount;
+}
+
+sub fetchRelayBandwidthRate {
+    my $config = shift;
+    my $bandwidthRate = 0;
+
+    foreach my $line ( split("\n", $config) ) {
+        chomp($line);
+
+        if ( $line =~ m/RelayBandwidthRate (\d+)/ ) {
+            $bandwidthRate = $1;
+            writeLog('Found bandwidth rate: ' . $bandwidthRate);
+        }
+    }
+
+    return $bandwidthRate;
+}
+
+sub fetchRelayBandwidthBurst {
+    my $config = shift;
+    my $bandwidthBurst = 0;
+
+    foreach my $line ( split("\n", $config) ) {
+        chomp($line);
+
+        if ( $line =~ m/RelayBandwidthBurst (\d+)/ ) {
+            $bandwidthBurst = $1;
+            writeLog('Found bandwidth burst: ' . $bandwidthBurst);
+        }
+    }
+
+    return $bandwidthBurst;
+}
+
+sub fetchConfig {
+    my $socket = shift;
+    my $line;
+    my $output;
+
+    print $socket "GETINFO config-text\n";
+    writeLog('Sent config fetch command');
+    sleep(2);
+
+    while ( $line = <$socket> ) {
+        $output .= $line;
+
+        last if ( $line =~ /250 OK/);
+    }
+
+    return $output;
+}
+
+sub exitCritical {
+    printf("CRITICAL - %s\n", shift);
+    exit 2;
+}
+
+sub writeLog {
+    printf("Log: %s\n", shift) if ( $DEBUG );
+}
+
+sub checkDebugSwitch {
+    if ( $ENV{'DEBUG'} ) {
+        $DEBUG = $ENV{'DEBUG'};
+    }
+}
