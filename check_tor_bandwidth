@@ -16,8 +16,7 @@ sub main {
     my $rejectCount = fetchExitPolicyRejectCount($config);
     my $bandwidthRate = fetchRelayBandwidthRate($config);
     my $bandwidthBurst = fetchRelayBandwidthBurst($config);
-    #my @results = fetchBandwidth($socket);
-    my @results = fetchBandwidth2($socket);
+    my @results = fetchBandwidth($socket);
     quit($socket);
 
     printf("OK - Read: %d Write: %d Reject-Count: %d|read=%d;0;0;%d;%d write=%d;0;0;%d;%d rejectCount=%d\n",
@@ -86,39 +85,6 @@ sub talkToSocketAndReceiveOutput {
     return $line;
 }
 
-sub fetchBandwidth {
-    my $socket = shift;
-    my $line;
-    my $read = 0;
-    my $write = 0;
-
-    print $socket "SETEVENTS BW\n";
-    writeLog('Startet listening for BW events');
-    sleep(2);
-    print $socket "SETEVENTS\n";
-    writeLog('Stopped listening fro BW events');
-
-    while ( $line = <$socket> ) {
-        chomp($line);
-
-        if ( $line =~ m/650 BW (\d+) (\d+)/ ) {
-            $read = $1;
-            $write = $2;
-            last;
-        }
-    }
-
-    if ( $read == 0 || $write == 0 ) {
-        exitCritical("Didn't receive values. Read: $read Write: $write");
-    }
-
-    my @ret;
-    $ret[0] = $read;
-    $ret[1] = $write;
-
-    return @ret;
-}
-
 sub fetchExitPolicyRejectCount {
     my $config = shift;
     my $rejectCount = 0;
@@ -185,7 +151,7 @@ sub fetchConfig {
     return $output;
 }
 
-sub fetchBandwidth2 {
+sub fetchBandwidth {
     my $socket = shift;
 
     print $socket "GETINFO bw-event-cache\n";
