@@ -154,11 +154,10 @@ sub fetchConfig {
 sub fetchBandwidth {
     my $socket = shift;
 
-    print $socket "GETINFO bw-event-cache\n";
-    writeLog('Sent bw-event-cache fetch command');
-
-    my $output = <$socket>;
-    writeLog('Received output: ' . $output);
+    my $output = talkToSocketAndReceiveOutput(
+        $socket,
+        "GETINFO bw-event-cache"
+    );
 
     my @bwCachePairs = split(' ', $output);
     writeLog(sprintf("Got %d bw-cache-entries", scalar(@bwCachePairs)));
