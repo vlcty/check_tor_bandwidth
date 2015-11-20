@@ -1,19 +1,4 @@
 #!/usr/bin/perl
-# check_tor_bandwidth - Get performance data from your relay
-# Copyright (C) <year>  <name of author>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use strict;
 use IO::Socket::UNIX qw( SOCK_STREAM );
@@ -31,7 +16,8 @@ sub main {
     my $rejectCount = fetchExitPolicyRejectCount($config);
     my $bandwidthRate = fetchRelayBandwidthRate($config);
     my $bandwidthBurst = fetchRelayBandwidthBurst($config);
-    my @results = fetchBandwidth($socket);
+    #my @results = fetchBandwidth($socket);
+    my @results = fetchBandwidth2($socket);
     quit($socket);
 
     printf("OK - Read: %d Write: %d Reject-Count: %d|read=%d;0;0;%d;%d write=%d;0;0;%d;%d rejectCount=%d\n",
@@ -197,6 +183,41 @@ sub fetchConfig {
     }
 
     return $output;
+}
+
+sub fetchBandwidth2 {
+    my $socket = shift;
+
+    print $socket "GETINFO bw-event-cache\n";
+    writeLog('Sent bw-event-cache fetch command');
+
+    my $output = <$socket>;
+    writeLog('Received output: ' . $output);
+
+    my @bwCachePairs = split(' ', $output);
+    writeLog(sprintf("Got %d bw-cache-entries", scalar(@bwCachePairs)));
+
+    my $readBytesSum = 0;
+    my $writeBytesSum = 0;
+    my $counter = 0;
+
+    for ( my $i = scalar(@bwCachePairs);
+        ( $i >= scalar(@bwCachePairs) - 60 );
+            $i--) {
+        my $currentPair = $bwCachePairs[$i];
+
+        my @splitted = split(',', $currentPair);
+        $readBytesSum += $splitted[0];
+        $writeBytesSum += $splitted[1];
+    }
+
+    writeLog(sprintf("Readsum: %d Writesum: %d", $readBytesSum, $writeBytesSum));
+
+    my @ret;
+    $ret[0] = $readBytesSum / 60;
+    $ret[1] = $writeBytesSum / 60;
+
+    return @ret;
 }
 
 sub exitCritical {
