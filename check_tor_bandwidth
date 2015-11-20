@@ -160,14 +160,30 @@ sub fetchBandwidth {
     );
 
     my @bwCachePairs = split(' ', $output);
-    writeLog(sprintf("Got %d bw-cache-entries", scalar(@bwCachePairs)));
+    my $bwCachePairsAmount = scalar(@bwCachePairs);
+    writeLog(sprintf("Got %d bw-cache-entries", $bwCachePairsAmount));
 
     my $readBytesSum = 0;
     my $writeBytesSum = 0;
+    my $amountCacheEntriesToAnalyze = 0;
 
-    for ( my $i = scalar(@bwCachePairs);
-        ( $i >= scalar(@bwCachePairs) - 60 );
+    if ( $bwCachePairsAmount >= 60 ) {
+        # Bandwidth cache has 60 entries
+        # That's a whole minute
+        # Calculate average from that values
+        $amountCacheEntriesToAnalyze = 60;
+    }
+    else {
+        # Less than 60 entries
+        # -> Use all entries - 1 (first one is garbage data)
+        $amountCacheEntriesToAnalyze = $bwCachePairsAmount - 1;
+    }
+
+    # Loop reverse over the cache pairs
+    for ( my $i = $bwCachePairsAmount;
+            $i >= $bwCachePairsAmount - $amountCacheEntriesToAnalyze;
             $i--) {
+
         my $currentPair = $bwCachePairs[$i];
 
         my @splitted = split(',', $currentPair);
@@ -175,11 +191,13 @@ sub fetchBandwidth {
         $writeBytesSum += $splitted[1];
     }
 
-    writeLog(sprintf("Readsum: %d Writesum: %d", $readBytesSum, $writeBytesSum));
+    writeLog(sprintf("Readsum: %d Writesum: %d",
+        $readBytesSum,
+        $writeBytesSum));
 
     my @ret;
-    $ret[0] = $readBytesSum / 60;
-    $ret[1] = $writeBytesSum / 60;
+    $ret[0] = $readBytesSum / $amountCacheEntriesToAnalyze;
+    $ret[1] = $writeBytesSum / $amountCacheEntriesToAnalyze;
 
     return @ret;
 }
