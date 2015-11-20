@@ -164,7 +164,6 @@ sub fetchBandwidth {
 
     my $readBytesSum = 0;
     my $writeBytesSum = 0;
-    my $counter = 0;
 
     for ( my $i = scalar(@bwCachePairs);
         ( $i >= scalar(@bwCachePairs) - 60 );
