@@ -16,17 +16,17 @@ sub main {
     my $rejectCount = fetchExitPolicyRejectCount($config);
     my $bandwidthRate = fetchRelayBandwidthRate($config);
     my $bandwidthBurst = fetchRelayBandwidthBurst($config);
-    my @results = fetchBandwidth($socket);
+    my @bandwidthresults = fetchBandwidth($socket);
     quit($socket);
 
     printf("OK - Read: %d Write: %d Reject-Count: %d|read=%d;0;0;%d;%d write=%d;0;0;%d;%d rejectCount=%d\n",
-        $results[0],
-        $results[1],
+        $bandwidthresults[0],
+        $bandwidthresults[1],
         $rejectCount,
-        $results[0],
+        $bandwidthresults[0],
         $bandwidthRate,
         $bandwidthBurst,
-        $results[1],
+        $bandwidthresults[1],
         $bandwidthRate,
         $bandwidthBurst,
         $rejectCount);
