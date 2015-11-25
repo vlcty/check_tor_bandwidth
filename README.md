@@ -16,6 +16,18 @@ It retrieves the
 and prints the result as performance data for your monitoring system (for exampe
 your Icinga 1/2 or Nagios).
 
+# Preview
+
+The graphing of the given performance data is done with graphite and grafana.
+It can look like this:
+
+![Previewimage](https://blog.veloc1ty.de/bandwidth-small.png)
+
+I think GitHub caches the Image. Periodically updated pictures (every 30 minutes) can be found on my blog:
+
+* Small preview: https://blog.veloc1ty.de/bandwidth-small.png
+* Big preview: https://blog.veloc1ty.de/bandwidth-small.png
+
 # How it works
 
 The script connects to Tor's control UNIX socket, fetches and analyzes the
